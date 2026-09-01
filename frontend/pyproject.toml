@@ -1,0 +1,6 @@
+[project]
+name = "akinator-frontend"
+version = "0.1.0"
+description = "Cliente Python (y futuro frontend Tkinter) para el motor Akinator en Racket"
+requires-python = ">=3.11"
+dependencies = []
