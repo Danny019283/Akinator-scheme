@@ -1,0 +1,15 @@
+# Racket
+compiled/
+*.zo
+*.dep
+*.so
+errortrace-compiled/
+
+# Editores / SO
+.DS_Store
+*~
+.vscode/
+.idea/
+
+# Notas de planificacion internas (no forman parte del entregable)
+docs/superpowers/
