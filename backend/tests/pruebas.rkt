@@ -1,6 +1,6 @@
 #lang racket
 
-(require rackunit racket/file "../dominio.rkt" "../reglas.rkt" "../respuestas.rkt" "../motor.rkt" "../estadisticas.rkt")
+(require rackunit "../dominio.rkt" "../reglas.rkt" "../respuestas.rkt" "../motor.rkt")
 
 ; ======================================================================
 ; FASE 1: DOMINIO Y DATOS BASE
@@ -84,6 +84,30 @@
   (check-equal? (combinar-cf 1.0 -1.0) 0.0)
   (check-equal? (combinar-cf -1.0 1.0) 0.0))
 
+(test-case "caso 4 (obligatorio): respuestas probabilisticas cambian la confianza de forma coherente (menor magnitud, misma polaridad)"
+  ; 'probablemente/'probablemente-no deben mover el CF en la MISMA direccion que
+  ; 'si/'no respectivamente, pero con MENOS fuerza -- nunca deben invertir el
+  ; signo ni aportar mas evidencia que una respuesta segura.
+  (define cf-si (cf-evidencia (respuesta->peso 'si) 1))
+  (define cf-probablemente (cf-evidencia (respuesta->peso 'probablemente) 1))
+  (define cf-no (cf-evidencia (respuesta->peso 'no) 1))
+  (define cf-probablemente-no (cf-evidencia (respuesta->peso 'probablemente-no) 1))
+  (check-true (> cf-si cf-probablemente 0)
+              "probablemente debe aportar evidencia positiva, pero menor que 'si")
+  (check-true (< cf-no cf-probablemente-no 0)
+              "probablemente-no debe aportar evidencia negativa, pero menor que 'no")
+  ; el mismo par de candidatos, uno respondido con certeza total y otro con
+  ; respuestas "probablemente", debe terminar con el segundo mas cerca de 0
+  ; (menos confianza acumulada) pero en la misma direccion (misma polaridad)
+  (define candidatos (cargar-conocimiento))
+  (define pregunta (seleccionar-pregunta candidatos '()))
+  (define con-si (filtrar-candidatos candidatos pregunta (respuesta->peso 'si) 'si))
+  (define con-probablemente (filtrar-candidatos candidatos pregunta (respuesta->peso 'probablemente) 'probablemente))
+  (for ([c-si con-si] [c-prob con-probablemente])
+    (define original (cadr (assoc (car c-si) candidatos)))
+    (check-true (<= (abs (- (cadr c-prob) original)) (abs (- (cadr c-si) original)))
+                (format "~a: 'probablemente no deberia mover el CF mas que 'si" (car c-si)))))
+
 (test-case "filtrar-candidatos no toca un candidato sin evidencia real"
   (define candidatos (cargar-conocimiento))
   ; "no-se" nunca debe mover el CF de nadie, tenga o no el rasgo definido
@@ -147,6 +171,24 @@
   (define resultado (simular-partida '()))
   (check-equal? (car (first resultado)) 'continuar))
 
+(test-case "caso 5 (obligatorio): entidad ambigua sin certeza suficiente -- se agotan las preguntas y se informa el mejor candidato, no una prediccion"
+  ; mismo escenario que la prueba anterior, pero verificando explicitamente la
+  ; condicion que servidor.rkt usa para emitir 'sin_preguntas': ya no queda
+  ; ninguna caracteristica sin preguntar (seleccionar-pregunta => #f) y el CF
+  ; del lider sigue sin alcanzar umbral-cf, asi que solo se puede reportar el
+  ; "mejor candidato" (mejores-dos), nunca una 'prediccion.
+  (match-define (list resultado historial preguntas) (simular-partida '()))
+  (check-equal? (car resultado) 'continuar)
+  (define candidatos-finales (cargar-conocimiento))
+  ; reconstruimos el estado final: con todo respondido 'no-se, filtrar-candidatos
+  ; nunca toca a nadie, asi que los candidatos siguen igual que al cargar
+  (check-false (seleccionar-pregunta candidatos-finales preguntas))
+  (define top2 (mejores-dos candidatos-finales historial))
+  (define mejor-candidato (car top2))
+  (check-true (symbol? (car mejor-candidato)))
+  (check-true (< (cadr mejor-candidato) umbral-cf)
+              "el mejor candidato no deberia superar el umbral de certeza en este escenario"))
+
 (test-case "entidad dificil: Ornitorrinco converge con sus propios hechos"
   (define hechos (cdr (assoc 'Ornitorrinco conocimiento)))
   (define respuestas (map (lambda (h) (cons (car h) (if (equal? (cadr h) 'si) 'si 'no))) hechos))
@@ -189,49 +231,17 @@
       (list (car entidad) veredicto)))
   (check-equal? predicciones-incorrectas '()))
 
-; ======================================================================
-; FASE 6: ESTADISTICAS PERSISTENTES (partidas, aciertos, fallos, preguntas)
-; ======================================================================
-
-(test-case "cargar-estadisticas sobre un archivo inexistente devuelve todo en cero"
-  (define ruta (build-path (find-system-path 'temp-dir) "estadisticas-prueba-inexistente.json"))
-  (when (file-exists? ruta) (delete-file ruta))
-  (define estadisticas (cargar-estadisticas ruta))
-  (check-equal? (hash-ref estadisticas 'partidas) 0)
-  (check-equal? (hash-ref estadisticas 'aciertos) 0)
-  (check-equal? (hash-ref estadisticas 'fallos) 0)
-  (check-equal? (hash-ref estadisticas 'total_preguntas) 0))
-
-(test-case "registrar-resultado con acierto suma partidas, aciertos y preguntas"
-  (define base (hasheq 'partidas 2 'aciertos 1 'fallos 1 'total_preguntas 20))
-  (define actualizado (registrar-resultado base #t 8))
-  (check-equal? (hash-ref actualizado 'partidas) 3)
-  (check-equal? (hash-ref actualizado 'aciertos) 2)
-  (check-equal? (hash-ref actualizado 'fallos) 1)
-  (check-equal? (hash-ref actualizado 'total_preguntas) 28))
-
-(test-case "registrar-resultado sin acierto suma fallos, no aciertos"
-  (define base (hasheq 'partidas 0 'aciertos 0 'fallos 0 'total_preguntas 0))
-  (define actualizado (registrar-resultado base #f 5))
-  (check-equal? (hash-ref actualizado 'aciertos) 0)
-  (check-equal? (hash-ref actualizado 'fallos) 1))
-
-(test-case "estadisticas->jsexpr calcula promedio_preguntas redondeado a 1 decimal"
-  (define estadisticas (hasheq 'partidas 3 'aciertos 2 'fallos 1 'total_preguntas 20))
-  (define jsexpr (estadisticas->jsexpr estadisticas))
-  (check-equal? (hash-ref jsexpr 'promedio_preguntas) 6.7))
-
-(test-case "estadisticas->jsexpr devuelve promedio 0.0 cuando no hay partidas"
-  (define jsexpr (estadisticas->jsexpr (hasheq 'partidas 0 'aciertos 0 'fallos 0 'total_preguntas 0)))
-  (check-equal? (hash-ref jsexpr 'promedio_preguntas) 0.0))
-
-(test-case "guardar-estadisticas y cargar-estadisticas hacen roundtrip completo"
-  (define ruta (build-path (find-system-path 'temp-dir) "estadisticas-prueba-roundtrip.json"))
-  (define original (hasheq 'partidas 5 'aciertos 3 'fallos 2 'total_preguntas 40))
-  (guardar-estadisticas original ruta)
-  (define leida (cargar-estadisticas ruta))
-  (check-equal? (hash-ref leida 'partidas) 5)
-  (check-equal? (hash-ref leida 'aciertos) 3)
-  (check-equal? (hash-ref leida 'fallos) 2)
-  (check-equal? (hash-ref leida 'total_preguntas) 40)
-  (delete-file ruta))
+(test-case "caso 2 (obligatorio): entidades muy similares se separan con preguntas discriminantes -- las 30 convergen a si mismas"
+  ; version mas estricta que la prueba anterior: no basta con "nunca predecir mal",
+  ; toda entidad debe alcanzar SU PROPIA prediccion respondiendo con sus propios
+  ; hechos. Si dos entidades comparten demasiados rasgos (ej. lobo/tigre antes de
+  ; agregar el rasgo distintivo), esta prueba lo revela como 'continuar en vez
+  ; de 'prediccion.
+  (define no-convergen
+    (for/list ([entidad conocimiento]
+               #:do [(define respuestas
+                       (map (lambda (h) (cons (car h) (if (equal? (cadr h) 'si) 'si 'no))) (cdr entidad)))
+                     (define veredicto (first (simular-partida respuestas)))]
+               #:unless (and (eq? (car veredicto) 'prediccion) (equal? (cadr veredicto) (car entidad))))
+      (list (car entidad) veredicto)))
+  (check-equal? no-convergen '()))

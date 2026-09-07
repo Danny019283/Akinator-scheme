@@ -1,50 +1,45 @@
+from Estadisticas import Estadisticas
 from EstadisticasServicio import EstadisticasServicio
 
 
-class ClienteFalso:
-    """Doble de ClienteScheme: registra el ultimo mensaje enviado y
-    devuelve una respuesta programada, sin lanzar ningun subproceso."""
+class RepositorioFalso:
+    def __init__(self, estadisticas=None):
+        self.estadisticas = estadisticas or Estadisticas()
+        self.guardados = []
 
-    def __init__(self, respuesta):
-        self.respuesta = respuesta
-        self.mensajes_enviados = []
+    def cargar(self):
+        return self.estadisticas
 
-    def enviar(self, mensaje):
-        self.mensajes_enviados.append(mensaje)
-        return self.respuesta
-
-
-def test_obtener_pide_estadisticas_al_backend():
-    cliente = ClienteFalso({"tipo": "estadisticas", "partidas": 5, "aciertos": 3,
-                             "fallos": 2, "promedio_preguntas": 6.7})
-    servicio = EstadisticasServicio(cliente)
-
-    resultado = servicio.obtener()
-
-    assert cliente.mensajes_enviados == [{"cmd": "estadisticas"}]
-    assert resultado == cliente.respuesta
+    def guardar(self, estadisticas):
+        self.guardados.append(estadisticas.a_diccionario())
 
 
-def test_registrar_resultado_con_acierto_manda_acierto_true():
-    cliente = ClienteFalso({"tipo": "estadisticas", "partidas": 1, "aciertos": 1,
-                             "fallos": 0, "promedio_preguntas": 8.0})
-    servicio = EstadisticasServicio(cliente)
+def test_obtener_devuelve_lo_que_carga_el_repositorio():
+    repositorio = RepositorioFalso(Estadisticas(partidas=5, aciertos=3, fallos=2, total_preguntas=40))
+    servicio = EstadisticasServicio(repositorio)
+
+    estadisticas = servicio.obtener()
+
+    assert estadisticas.partidas == 5
+    assert estadisticas.promedio_preguntas == 8.0
+
+
+def test_registrar_resultado_actualiza_y_persiste():
+    repositorio = RepositorioFalso(Estadisticas())
+    servicio = EstadisticasServicio(repositorio)
 
     resultado = servicio.registrar_resultado(True, 8)
 
-    assert cliente.mensajes_enviados == [
-        {"cmd": "registrar_resultado", "acierto": True, "numero_preguntas": 8}
-    ]
-    assert resultado == cliente.respuesta
+    assert resultado.partidas == 1
+    assert resultado.aciertos == 1
+    assert repositorio.guardados == [{"partidas": 1, "aciertos": 1, "fallos": 0, "total_preguntas": 8}]
 
 
-def test_registrar_resultado_con_fallo_manda_acierto_false():
-    cliente = ClienteFalso({"tipo": "estadisticas", "partidas": 1, "aciertos": 0,
-                             "fallos": 1, "promedio_preguntas": 5.0})
-    servicio = EstadisticasServicio(cliente)
+def test_registrar_resultado_con_fallo_no_suma_aciertos():
+    repositorio = RepositorioFalso(Estadisticas())
+    servicio = EstadisticasServicio(repositorio)
 
-    servicio.registrar_resultado(False, 5)
+    resultado = servicio.registrar_resultado(False, 5)
 
-    assert cliente.mensajes_enviados == [
-        {"cmd": "registrar_resultado", "acierto": False, "numero_preguntas": 5}
-    ]
+    assert resultado.aciertos == 0
+    assert resultado.fallos == 1

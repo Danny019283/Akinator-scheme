@@ -10,22 +10,26 @@ import os
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_PROJECT_ROOT, "comunicacion"))
 sys.path.insert(0, os.path.join(_PROJECT_ROOT, "servicios"))
+sys.path.insert(0, os.path.join(_PROJECT_ROOT, "estadisticas"))
 sys.path.insert(0, os.path.join(_PROJECT_ROOT, "vista"))
 
 import streamlit as st
 
 from ClienteScheme import ClienteScheme
 from AkinatorServicio import AkinatorServicio
+from EstadisticasRepositorio import EstadisticasRepositorio
 from EstadisticasServicio import EstadisticasServicio
 from AkinatorVista import AkinatorVista
 
 
 def _inicializar_sistema():
     """Crea el cliente Racket y los servicios una sola vez por sesión de
-    navegador. El motor Scheme calcula y persiste las estadísticas; si
-    falla al iniciar, la app queda sin poder consultarlas ni jugar."""
+    navegador. Las estadísticas se cargan desde estadisticas/estadisticas.json
+    y quedan disponibles aunque el motor de Racket falle al iniciar."""
     if "inicializado" in st.session_state:
         return
+
+    st.session_state.estadisticas_servicio = EstadisticasServicio(EstadisticasRepositorio())
 
     try:
         cliente = ClienteScheme()
@@ -35,7 +39,6 @@ def _inicializar_sistema():
         return
 
     st.session_state.servicio = AkinatorServicio(cliente)
-    st.session_state.estadisticas_servicio = EstadisticasServicio(cliente)
     st.session_state.error_inicio = None
     st.session_state.inicializado = True
 

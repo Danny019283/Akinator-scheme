@@ -4,7 +4,6 @@ compiled/
 *.dep
 *.so
 errortrace-compiled/
-backend/estadisticas.json
 
 # Editores / SO
 .DS_Store
@@ -18,3 +17,4 @@ docs/superpowers/
 # Python
 __pycache__/
 *.pyc
+frontend/estadisticas/estadisticas.json

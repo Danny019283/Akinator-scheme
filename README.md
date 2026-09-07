@@ -6,6 +6,10 @@ MYCIN) en vez de un puntaje simple. Incluye encadenamiento hacia adelante
 de reglas, selección dinámica de preguntas por balance de partición, y un
 protocolo de comunicación con Python para un futuro frontend.
 
+Documento técnico completo (arquitectura, conocimiento, inferencia,
+heurística, comunicación, pruebas y conclusiones, con diagramas):
+[`docs/documento_tecnico.md`](docs/documento_tecnico.md).
+
 ## Estructura del proyecto
 
 ```
@@ -14,23 +18,29 @@ backend/            Motor de inferencia en Racket
   reglas.rkt            Motor de reglas (forward chaining con punto fijo)
   respuestas.rkt        Tabla de Factores de Certeza por tipo de respuesta del usuario
   motor.rkt              Motor CF: combinación de MYCIN, selección de preguntas, simulación de partidas
-  estadisticas.rkt        Partidas/aciertos/fallos/preguntas: cálculo y persistencia en JSON
   servidor.rkt           Servidor JSON linea-por-linea para hablar con el cliente Python
   tests/pruebas.rkt   Suite de pruebas (rackunit)
 
 frontend/            Frontend web en Streamlit (proyecto uv)
   app.py                 Punto de entrada: `streamlit run app.py`
   comunicacion/          ClienteScheme.py: lanza servidor.rkt como subproceso y habla el protocolo JSON
-  servicios/             AkinatorServicio.py (juego) y EstadisticasServicio.py (stats): traducen al protocolo
+  servicios/             AkinatorServicio.py: traduce iniciar/responder/reiniciar al protocolo del juego
+  estadisticas/           Estadisticas.py (modelo), EstadisticasRepositorio.py (persistencia en
+                          estadisticas.json, no versionado) y EstadisticasServicio.py — partidas,
+                          aciertos, fallos y promedio de preguntas, 100% en Python
   vista/                 AkinatorVista.py + preguntas.py: interfaz Streamlit con estilo tipo akinator.com
   assets/                Coloca aquí tu propio genio.png (opcional, ver LEEME_IMAGEN.txt)
-  tests/                 Suite de pruebas (pytest) de los servicios, con un ClienteScheme falso
+  tests/                 Suite de pruebas (pytest) de servicios y estadísticas, con dobles de prueba
   pyproject.toml         Manifiesto del proyecto (gestionado con uv)
 ```
 
-Toda la lógica de juego y de estadísticas vive en Racket; el frontend
-solo dibuja el estado y traduce clics a comandos del protocolo JSON —
-no hay modelos, controlador ni persistencia de datos en el lado Python.
+El razonamiento (conocimiento, reglas, inferencia, selección de preguntas,
+confianza, explicación) vive enteramente en Racket. Las estadísticas de
+uso de la app (partidas, aciertos, fallos, promedio de preguntas) viven
+en Python, en `frontend/estadisticas/` — es interacción/telemetría de la
+capa de presentación, no razonamiento simbólico, así que no necesita
+pasar por el motor. Ver el documento técnico para la justificación
+completa de este reparto.
 
 ## Cómo correr el frontend web
 
@@ -47,14 +57,55 @@ Esto abre el navegador en `http://localhost:8501`. La app lanza
 página (una sola vez por sesión de navegador) y a partir de ahí solo
 intercambia mensajes JSON con él en cada clic.
 
-## Requisitos
+## Requisitos y dependencias
 
-- **Racket** (probado con 9.3). Si no está en el `PATH`, cualquier
-  invocación de `racket`/`raco` en los comandos de abajo puede
-  reemplazarse por como esté instalado en tu sistema (por ejemplo, vía
-  flatpak: `flatpak run --command=racket org.racket_lang.Racket`).
+- **Racket 8.x/9.x** (probado con 9.2 y 9.3), con el paquete **`rackunit-lib`**
+  para correr `tests/pruebas.rkt` (`raco pkg install rackunit-lib` si no
+  viene incluido en tu instalación). No se necesita ningún otro paquete
+  de Racket: `json` y `racket/runtime-path` son parte de la distribución
+  base.
 - **Python 3.11+** con [`uv`](https://docs.astral.sh/uv/) para manejar el
-  entorno y las dependencias del frontend.
+  entorno y las dependencias del frontend. Las dependencias de Python
+  están fijadas en `frontend/pyproject.toml`/`uv.lock` (`streamlit>=1.35`
+  como dependencia de la app, `pytest` como dependencia de desarrollo) y
+  `uv sync` las instala automáticamente — no hace falta `pip install`
+  manual salvo que no uses `uv` (ver más abajo).
+
+### Instalación
+
+**Linux / macOS:**
+
+```bash
+# Racket (Fedora/Nobara: sudo dnf install racket · Debian/Ubuntu: sudo apt install racket · macOS: brew install racket)
+raco pkg install rackunit-lib
+
+# uv (gestor de Python)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+cd frontend
+uv sync
+```
+
+**Windows (PowerShell):**
+
+```powershell
+# Racket: instalar desde https://racket-lang.org/download/ (incluye raco)
+raco pkg install rackunit-lib
+
+# uv (gestor de Python)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+cd frontend
+uv sync
+```
+
+Si `racket`/`raco` no quedan en el `PATH` tras instalar, cualquier
+invocación de esos comandos en este README puede reemplazarse por como
+esté instalado en tu sistema (por ejemplo, vía flatpak en Linux:
+`flatpak run --command=racket org.racket_lang.Racket`).
+
+Sin `uv`, el frontend también puede correrse con `pip`:
+`pip install streamlit pytest && streamlit run app.py` desde `frontend/`.
 
 ## Cómo correr las pruebas del motor
 
@@ -102,8 +153,6 @@ Racket hace `flush-output` después de cada respuesta para que el
 {"cmd": "iniciar"}
 {"cmd": "responder", "caracteristica": "mamifero", "respuesta": "si"}
 {"cmd": "reiniciar"}
-{"cmd": "estadisticas"}
-{"cmd": "registrar_resultado", "acierto": true, "numero_preguntas": 8}
 ```
 
 `respuesta` acepta `"si"`, `"probablemente"`, `"no-se"`,
@@ -115,14 +164,14 @@ Racket hace `flush-output` después de cada respuesta para que el
 {"tipo": "pregunta", "caracteristica": "mamifero", "numero_pregunta": 1}
 {"tipo": "prediccion", "entidad": "tigre", "certeza": 0.999, "porcentaje": "100%", "explicacion": ["nocturno", "salvaje", "..."]}
 {"tipo": "sin_preguntas", "mejor_candidato": "tigre", "certeza": 0.4}
-{"tipo": "estadisticas", "partidas": 5, "aciertos": 3, "fallos": 2, "promedio_preguntas": 6.7}
 {"tipo": "error", "mensaje": "..."}
 ```
 
-Las estadísticas se acumulan en Racket (`backend/estadisticas.rkt`) y se
-persisten en `backend/estadisticas.json` (no versionado); tanto
-`"estadisticas"` como `"registrar_resultado"` devuelven el objeto
-`"estadisticas"` completo y ya actualizado.
+Las estadísticas (partidas, aciertos, fallos, promedio de preguntas) no
+pasan por este protocolo: Python las calcula y persiste directamente en
+`frontend/estadisticas/estadisticas.json` a partir del número de preguntas
+que ya contó al mostrar la partida y del botón Correcto/Incorrecto que
+pulsa el usuario.
 
 ## Diseño del motor de Factores de Certeza
 
@@ -138,7 +187,9 @@ incremental de MYCIN a medida que llegan respuestas:
   polaridad opuesta, y una guarda explícita de división por cero cuando
   dos evidencias de certeza total y signo contrario se combinan).
 - El motor predice cuando el candidato líder supera un umbral de CF
-  (`0.6`) con un margen mínimo (`0.15`) sobre el segundo.
+  (`0.6`) con un margen mínimo (`0.3`) sobre el segundo, o —cuando el CF
+  está prácticamente empatado por saturación— con estrictamente más
+  coincidencias reales con el historial que el segundo lugar.
 
 Dos ajustes respecto a una implementación literal de MYCIN, necesarios
 para que el motor converja con este dominio de datos:
@@ -155,9 +206,10 @@ para que el motor converja con este dominio de datos:
    prácticamente empatado, el motor desempata a favor del candidato con
    más respuestas del historial consistentes con sus propios hechos.
 
-Con esto, la demo de "tigre" converge en 17 preguntas con ~100% de
+Con esto, la demo de "tigre" converge en 15 preguntas con ~100% de
 certeza, y sobre las 30 entidades del dominio (respondiendo según sus
-propios hechos) 29/30 convergen a la entidad correcta — la única
-excepción (*lobo*) no tiene, en los datos actuales, ningún rasgo que lo
-distinga de *tigre*. El motor nunca predice una entidad incorrecta
-(verificado en `tests/pruebas.rkt`).
+propios hechos) las 30 convergen a la entidad correcta — incluyendo el
+par más parecido del dominio, *lobo* y *tigre*, que solo se distinguen
+por `nocturno` y `vive-en-manada`. El motor nunca predice una entidad
+incorrecta y siempre converge a la propia cuando hay evidencia completa
+(verificado en `tests/pruebas.rkt`, caso obligatorio 2 del enunciado).

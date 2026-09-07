@@ -32,7 +32,7 @@
     (Ornitorrinco (mamifero si)(domestico no)(carnivoro si)(tiene-pelo si)(grande no)(tiene-cola si)(vive-en-australia si)(venenoso si)(nada si))
     (oveja       (mamifero si)(domestico si)(herbivoro si)(tiene-pelo si)(pequeno si)(tiene-cola si)(rapido no)(vive-en-sabana si))
     (cerdo       (mamifero si)(domestico si)(omnivoro si)(tiene-pelo si)(pequeno si)(tiene-cola si)(rapido no)(vive-en-sabana si))
-    (lobo        (mamifero si)(salvaje si)(carnivoro si)(tiene-pelo si)(grande si)(tiene-cola si)(rapido si)(vive-en-selva si))
+    (lobo        (mamifero si)(salvaje si)(carnivoro si)(tiene-pelo si)(grande si)(tiene-cola si)(rapido si)(vive-en-selva si)(nocturno no)(vive-en-manada si))
     (zorro       (mamifero si)(salvaje si)(omnivoro si)(tiene-pelo si)(pequeno si)(tiene-cola si)(rapido si)(nocturno si))
     (oso         (mamifero si)(salvaje si)(omnivoro si)(tiene-pelo si)(grande si)(tiene-cola si)(vive-en-selva si)(nocturno no))
     (panda       (mamifero si)(salvaje si)(herbivoro si)(tiene-pelo si)(grande si)(tiene-cola si)(vive-en-selva si)(rapido no))

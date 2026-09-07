@@ -38,8 +38,8 @@ def _fuente_base64(ruta):
 
 class AkinatorVista:
     """Dibuja el estado actual del juego. La partida en curso vive en
-    st.session_state. Las estadísticas acumuladas las calcula y persiste
-    el motor Scheme; esta vista solo las pide/reporta por el protocolo.
+    st.session_state. Las estadísticas acumuladas viven en el servicio de
+    estadísticas, que a su vez las persiste en estadisticas/estadisticas.json.
     """
 
     def __init__(self, servicio, estadisticas_servicio):
@@ -71,10 +71,10 @@ class AkinatorVista:
             st.markdown("### Estadísticas")
             stats = self.estadisticas_servicio.obtener()
             col1, col2 = st.columns(2)
-            col1.metric("Partidas", stats["partidas"])
-            col2.metric("Prom. preguntas", stats["promedio_preguntas"])
-            col1.metric("Aciertos", stats["aciertos"])
-            col2.metric("Fallos", stats["fallos"])
+            col1.metric("Partidas", stats.partidas)
+            col2.metric("Prom. preguntas", stats.promedio_preguntas)
+            col1.metric("Aciertos", stats.aciertos)
+            col2.metric("Fallos", stats.fallos)
 
             st.markdown("---")
             st.markdown("### Historial de esta partida")

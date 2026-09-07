@@ -1,6 +1,6 @@
 #lang racket
 
-(require json "motor.rkt" "respuestas.rkt" "estadisticas.rkt")
+(require json "motor.rkt" "respuestas.rkt")
 
 ; PARTE 5: SERVIDOR DE COMUNICACION CON PYTHON
 ; Protocolo: subproceso persistente, un objeto JSON por linea en stdin/stdout.
@@ -11,21 +11,17 @@
 ;   {"cmd": "iniciar"}
 ;   {"cmd": "responder", "caracteristica": "mamifero", "respuesta": "si"}
 ;   {"cmd": "reiniciar"}
-;   {"cmd": "estadisticas"}
-;   {"cmd": "registrar_resultado", "acierto": true, "numero_preguntas": 8}
 ;
 ; Respuestas que emite (stdout, un JSON por linea):
 ;   {"tipo": "pregunta", "caracteristica": "mamifero", "numero_pregunta": 1, "candidatos_restantes": 25, "total_candidatos": 30}
 ;   {"tipo": "prediccion", "entidad": "tigre", "certeza": 0.999, "porcentaje": "100%", "explicacion": [...]}
 ;   {"tipo": "sin_preguntas", "mejor_candidato": "tigre", "certeza": 0.4}
-;   {"tipo": "estadisticas", "partidas": 5, "aciertos": 3, "fallos": 2, "promedio_preguntas": 6.7}
 ;   {"tipo": "error", "mensaje": "..."}
 
 (define estado-candidatos (box #f))
 (define estado-historial (box '()))
 (define estado-preguntas (box '()))
 (define estado-contador (box 0))
-(define estado-estadisticas (box (cargar-estadisticas)))
 
 (define (reiniciar-estado!)
   (set-box! estado-candidatos (cargar-conocimiento))
@@ -85,15 +81,6 @@
     (set-box! estado-historial (cons (cons caracteristica cf-respuesta) (unbox estado-historial))))
   (set-box! estado-preguntas (cons caracteristica (unbox estado-preguntas))))
 
-(define (emitir-estadisticas)
-  (emitir (estadisticas->jsexpr (unbox estado-estadisticas))))
-
-(define (procesar-registrar-resultado obj)
-  (define acierto? (hash-ref obj 'acierto))
-  (define numero-preguntas (hash-ref obj 'numero_preguntas))
-  (set-box! estado-estadisticas (registrar-resultado (unbox estado-estadisticas) acierto? numero-preguntas))
-  (guardar-estadisticas (unbox estado-estadisticas)))
-
 (define (procesar-linea linea)
   (with-handlers ([exn:fail? (lambda (e) (emitir (hasheq 'tipo "error" 'mensaje (exn-message e))))])
     (define obj (string->jsexpr linea))
@@ -102,8 +89,6 @@
       ((equal? cmd "iniciar") (reiniciar-estado!) (emitir-estado-actual))
       ((equal? cmd "reiniciar") (reiniciar-estado!) (emitir-estado-actual))
       ((equal? cmd "responder") (procesar-responder obj) (emitir-estado-actual))
-      ((equal? cmd "estadisticas") (emitir-estadisticas))
-      ((equal? cmd "registrar_resultado") (procesar-registrar-resultado obj) (emitir-estadisticas))
       (else (emitir (hasheq 'tipo "error" 'mensaje (format "comando desconocido: ~a" cmd)))))))
 
 (module+ main
