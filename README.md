@@ -17,13 +17,30 @@ backend/            Motor de inferencia en Racket
   servidor.rkt           Servidor JSON linea-por-linea para hablar con el cliente Python
   tests/pruebas.rkt   Suite de pruebas (rackunit)
 
-frontend/            Cliente Python (proyecto uv)
-  cliente.py            Cliente que lanza servidor.rkt como subproceso y habla el protocolo JSON
+frontend/            Frontend web en Streamlit (proyecto uv)
+  app.py                 Punto de entrada: `streamlit run app.py`
+  comunicacion/          ClienteScheme.py: lanza servidor.rkt como subproceso y habla el protocolo JSON
+  servicios/             AkinatorServicio.py: traduce iniciar/responder/reiniciar al protocolo
+  controlador/           AkinatorController.py: capa fina entre la vista y el servicio
+  vista/                 AkinatorVista.py + preguntas.py: interfaz Streamlit con estilo tipo akinator.com
+  assets/                Coloca aquí tu propio genio.png (opcional, ver LEEME_IMAGEN.txt)
   pyproject.toml         Manifiesto del proyecto (gestionado con uv)
 ```
 
-El frontend gráfico (Tkinter) todavía no está implementado; por ahora
-`frontend/` solo contiene el canal de comunicación con el motor.
+## Cómo correr el frontend web
+
+```bash
+cd frontend
+uv sync
+uv run streamlit run app.py
+```
+
+(o, sin `uv`: `pip install streamlit` y luego `streamlit run app.py`)
+
+Esto abre el navegador en `http://localhost:8501`. La app lanza
+`backend/servidor.rkt` como subproceso la primera vez que cargas la
+página (una sola vez por sesión de navegador) y a partir de ahí solo
+intercambia mensajes JSON con él en cada clic.
 
 ## Requisitos
 

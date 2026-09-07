@@ -13,7 +13,7 @@
 ;   {"cmd": "reiniciar"}
 ;
 ; Respuestas que emite (stdout, un JSON por linea):
-;   {"tipo": "pregunta", "caracteristica": "mamifero", "numero_pregunta": 1}
+;   {"tipo": "pregunta", "caracteristica": "mamifero", "numero_pregunta": 1, "candidatos_restantes": 25, "total_candidatos": 30}
 ;   {"tipo": "prediccion", "entidad": "tigre", "certeza": 0.999, "porcentaje": "100%", "explicacion": [...]}
 ;   {"tipo": "sin_preguntas", "mejor_candidato": "tigre", "certeza": 0.4}
 ;   {"tipo": "error", "mensaje": "..."}
@@ -33,12 +33,19 @@
   (displayln (jsexpr->string obj))
   (flush-output))
 
+; no se acepta una prediccion antes de haber hecho al menos esta cantidad
+; de preguntas, aunque el CF ya cumpla umbral-cf y margen-minimo. Evita
+; "adivinar" con 2-3 respuestas genericas (mamifero=si, salvaje=si, etc.)
+; que muchos candidatos comparten por igual.
+(define minimo-preguntas 5)
+
 (define (emitir-estado-actual)
   (define candidatos (unbox estado-candidatos))
   (define historial (unbox estado-historial))
   (define resultado (inferir candidatos historial))
   (cond
-    ((eq? (car resultado) 'prediccion)
+    ((and (eq? (car resultado) 'prediccion)
+          (>= (unbox estado-contador) minimo-preguntas))
      (define nombre (cadr resultado))
      (define certeza (caddr resultado))
      (define ganador (assoc nombre candidatos))
@@ -49,12 +56,16 @@
                       'explicacion (map (lambda (r) (symbol->string (car r))) (explicar ganador historial)))))
     (else
      (define siguiente (seleccionar-pregunta candidatos (unbox estado-preguntas)))
+     (define candidatos-vivos (length (filter (lambda (c) (>= (cadr c) 0)) candidatos)))
      (if siguiente
          (begin
            (set-box! estado-contador (add1 (unbox estado-contador)))
            (emitir (hasheq 'tipo "pregunta"
                             'caracteristica (symbol->string siguiente)
-                            'numero_pregunta (unbox estado-contador))))
+                            'numero_pregunta (unbox estado-contador)
+                            'candidatos_restantes candidatos-vivos
+                            'total_candidatos (length candidatos))))
+
          (let ((top1 (car (mejores-dos candidatos historial))))
            (emitir (hasheq 'tipo "sin_preguntas"
                             'mejor_candidato (symbol->string (car top1))

@@ -97,7 +97,7 @@
 (define umbral-cf 0.6)
 ; margen-minimo: separacion minima entre el CF del 1ro y el del 2do para evitar
 ; predicciones apresuradas en un casi-empate.
-(define margen-minimo 0.15)
+(define margen-minimo 0.3)
 
 ; inferir: decide si ya se puede predecir o si hay que seguir preguntando,
 ; usando directamente el CF combinado como confianza (no hace falta normalizar).
@@ -141,12 +141,19 @@
   (let ((particion (contar-particion caracteristica candidatos)))
     (min (car particion) (cdr particion))))
 
-; seleccionar-pregunta: elige la caracteristica no preguntada aun que mejor
-; discrimina entre los candidatos restantes. Devuelve #f si no queda ninguna.
+; solo se consideran "vivos" los candidatos cuyo CF no ha sido descartado
+; por la evidencia acumulada (mismo criterio usado para candidatos_restantes
+; en servidor.rkt). Si por algun motivo quedaran cero vivos (caso extremo),
+; se cae de vuelta a usar todos para no romper la partida.
+(define (candidatos-vivos candidatos)
+  (let ((vivos (filter (lambda (c) (>= (cadr c) 0)) candidatos)))
+    (if (null? vivos) candidatos vivos)))
+
 (define (seleccionar-pregunta candidatos preguntas-realizadas)
-  (let* ((disponibles (filter (lambda (c) (not (member c preguntas-realizadas)))
-                               (todas-las-caracteristicas candidatos)))
-         (con-puntaje (map (lambda (c) (cons c (puntaje-discriminacion c candidatos))) disponibles)))
+  (let* ((vivos (candidatos-vivos candidatos))
+         (disponibles (filter (lambda (c) (not (member c preguntas-realizadas)))
+                               (todas-las-caracteristicas vivos)))
+         (con-puntaje (map (lambda (c) (cons c (puntaje-discriminacion c vivos))) disponibles)))
     (if (null? con-puntaje)
         #f
         (car (argmax cdr con-puntaje)))))

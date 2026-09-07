@@ -13,3 +13,7 @@ errortrace-compiled/
 
 # Notas de planificacion internas (no forman parte del entregable)
 docs/superpowers/
+
+# Python
+__pycache__/
+*.pyc
