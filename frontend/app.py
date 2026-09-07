@@ -10,42 +10,32 @@ import os
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_PROJECT_ROOT, "comunicacion"))
 sys.path.insert(0, os.path.join(_PROJECT_ROOT, "servicios"))
-sys.path.insert(0, os.path.join(_PROJECT_ROOT, "controlador"))
 sys.path.insert(0, os.path.join(_PROJECT_ROOT, "vista"))
-sys.path.insert(0, os.path.join(_PROJECT_ROOT, "modelos"))
-sys.path.insert(0, os.path.join(_PROJECT_ROOT, "datos"))
 
 import streamlit as st
 
 from ClienteScheme import ClienteScheme
 from AkinatorServicio import AkinatorServicio
 from EstadisticasServicio import EstadisticasServicio
-from EstadisticasRepositorio import EstadisticasRepositorio
-from AkinatorController import AkinatorController
 from AkinatorVista import AkinatorVista
 
 
 def _inicializar_sistema():
-    """Crea el cliente Racket, los servicios y el controlador una sola
-    vez por sesión de navegador. Las estadísticas se cargan desde datos/estadisticas.json
-    y quedan disponibles aunque el motor de Racket falle al iniciar."""
+    """Crea el cliente Racket y los servicios una sola vez por sesión de
+    navegador. El motor Scheme calcula y persiste las estadísticas; si
+    falla al iniciar, la app queda sin poder consultarlas ni jugar."""
     if "inicializado" in st.session_state:
         return
-
-    estadisticas_servicio = EstadisticasServicio(EstadisticasRepositorio())
 
     try:
         cliente = ClienteScheme()
     except (FileNotFoundError, RuntimeError) as error:
         st.session_state.error_inicio = str(error)
-        st.session_state.estadisticas_servicio = estadisticas_servicio
         st.session_state.inicializado = True
         return
 
-    servicio = AkinatorServicio(cliente)
-    controlador = AkinatorController(servicio, estadisticas_servicio)
-
-    st.session_state.controlador = controlador
+    st.session_state.servicio = AkinatorServicio(cliente)
+    st.session_state.estadisticas_servicio = EstadisticasServicio(cliente)
     st.session_state.error_inicio = None
     st.session_state.inicializado = True
 
@@ -70,7 +60,7 @@ def main():
         )
         return
 
-    vista = AkinatorVista(st.session_state.controlador)
+    vista = AkinatorVista(st.session_state.servicio, st.session_state.estadisticas_servicio)
     vista.mostrar()
 
 

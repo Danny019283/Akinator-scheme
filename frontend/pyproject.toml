@@ -6,3 +6,8 @@ requires-python = ">=3.11"
 dependencies = [
     "streamlit>=1.35",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

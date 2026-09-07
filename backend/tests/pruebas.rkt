@@ -1,6 +1,6 @@
 #lang racket
 
-(require rackunit "../dominio.rkt" "../reglas.rkt" "../respuestas.rkt" "../motor.rkt")
+(require rackunit racket/file "../dominio.rkt" "../reglas.rkt" "../respuestas.rkt" "../motor.rkt" "../estadisticas.rkt")
 
 ; ======================================================================
 ; FASE 1: DOMINIO Y DATOS BASE
@@ -188,3 +188,50 @@
                #:when (and (eq? (car veredicto) 'prediccion) (not (equal? (cadr veredicto) (car entidad)))))
       (list (car entidad) veredicto)))
   (check-equal? predicciones-incorrectas '()))
+
+; ======================================================================
+; FASE 6: ESTADISTICAS PERSISTENTES (partidas, aciertos, fallos, preguntas)
+; ======================================================================
+
+(test-case "cargar-estadisticas sobre un archivo inexistente devuelve todo en cero"
+  (define ruta (build-path (find-system-path 'temp-dir) "estadisticas-prueba-inexistente.json"))
+  (when (file-exists? ruta) (delete-file ruta))
+  (define estadisticas (cargar-estadisticas ruta))
+  (check-equal? (hash-ref estadisticas 'partidas) 0)
+  (check-equal? (hash-ref estadisticas 'aciertos) 0)
+  (check-equal? (hash-ref estadisticas 'fallos) 0)
+  (check-equal? (hash-ref estadisticas 'total_preguntas) 0))
+
+(test-case "registrar-resultado con acierto suma partidas, aciertos y preguntas"
+  (define base (hasheq 'partidas 2 'aciertos 1 'fallos 1 'total_preguntas 20))
+  (define actualizado (registrar-resultado base #t 8))
+  (check-equal? (hash-ref actualizado 'partidas) 3)
+  (check-equal? (hash-ref actualizado 'aciertos) 2)
+  (check-equal? (hash-ref actualizado 'fallos) 1)
+  (check-equal? (hash-ref actualizado 'total_preguntas) 28))
+
+(test-case "registrar-resultado sin acierto suma fallos, no aciertos"
+  (define base (hasheq 'partidas 0 'aciertos 0 'fallos 0 'total_preguntas 0))
+  (define actualizado (registrar-resultado base #f 5))
+  (check-equal? (hash-ref actualizado 'aciertos) 0)
+  (check-equal? (hash-ref actualizado 'fallos) 1))
+
+(test-case "estadisticas->jsexpr calcula promedio_preguntas redondeado a 1 decimal"
+  (define estadisticas (hasheq 'partidas 3 'aciertos 2 'fallos 1 'total_preguntas 20))
+  (define jsexpr (estadisticas->jsexpr estadisticas))
+  (check-equal? (hash-ref jsexpr 'promedio_preguntas) 6.7))
+
+(test-case "estadisticas->jsexpr devuelve promedio 0.0 cuando no hay partidas"
+  (define jsexpr (estadisticas->jsexpr (hasheq 'partidas 0 'aciertos 0 'fallos 0 'total_preguntas 0)))
+  (check-equal? (hash-ref jsexpr 'promedio_preguntas) 0.0))
+
+(test-case "guardar-estadisticas y cargar-estadisticas hacen roundtrip completo"
+  (define ruta (build-path (find-system-path 'temp-dir) "estadisticas-prueba-roundtrip.json"))
+  (define original (hasheq 'partidas 5 'aciertos 3 'fallos 2 'total_preguntas 40))
+  (guardar-estadisticas original ruta)
+  (define leida (cargar-estadisticas ruta))
+  (check-equal? (hash-ref leida 'partidas) 5)
+  (check-equal? (hash-ref leida 'aciertos) 3)
+  (check-equal? (hash-ref leida 'fallos) 2)
+  (check-equal? (hash-ref leida 'total_preguntas) 40)
+  (delete-file ruta))

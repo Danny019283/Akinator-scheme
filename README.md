@@ -14,18 +14,23 @@ backend/            Motor de inferencia en Racket
   reglas.rkt            Motor de reglas (forward chaining con punto fijo)
   respuestas.rkt        Tabla de Factores de Certeza por tipo de respuesta del usuario
   motor.rkt              Motor CF: combinación de MYCIN, selección de preguntas, simulación de partidas
+  estadisticas.rkt        Partidas/aciertos/fallos/preguntas: cálculo y persistencia en JSON
   servidor.rkt           Servidor JSON linea-por-linea para hablar con el cliente Python
   tests/pruebas.rkt   Suite de pruebas (rackunit)
 
 frontend/            Frontend web en Streamlit (proyecto uv)
   app.py                 Punto de entrada: `streamlit run app.py`
   comunicacion/          ClienteScheme.py: lanza servidor.rkt como subproceso y habla el protocolo JSON
-  servicios/             AkinatorServicio.py: traduce iniciar/responder/reiniciar al protocolo
-  controlador/           AkinatorController.py: capa fina entre la vista y el servicio
+  servicios/             AkinatorServicio.py (juego) y EstadisticasServicio.py (stats): traducen al protocolo
   vista/                 AkinatorVista.py + preguntas.py: interfaz Streamlit con estilo tipo akinator.com
   assets/                Coloca aquí tu propio genio.png (opcional, ver LEEME_IMAGEN.txt)
+  tests/                 Suite de pruebas (pytest) de los servicios, con un ClienteScheme falso
   pyproject.toml         Manifiesto del proyecto (gestionado con uv)
 ```
+
+Toda la lógica de juego y de estadísticas vive en Racket; el frontend
+solo dibuja el estado y traduce clics a comandos del protocolo JSON —
+no hay modelos, controlador ni persistencia de datos en el lado Python.
 
 ## Cómo correr el frontend web
 
@@ -56,6 +61,13 @@ intercambia mensajes JSON con él en cada clic.
 ```bash
 cd backend
 raco test tests/pruebas.rkt
+```
+
+## Cómo correr las pruebas del frontend
+
+```bash
+cd frontend
+uv run pytest
 ```
 
 ## Cómo correr la demo standalone (sin Python)
@@ -90,6 +102,8 @@ Racket hace `flush-output` después de cada respuesta para que el
 {"cmd": "iniciar"}
 {"cmd": "responder", "caracteristica": "mamifero", "respuesta": "si"}
 {"cmd": "reiniciar"}
+{"cmd": "estadisticas"}
+{"cmd": "registrar_resultado", "acierto": true, "numero_preguntas": 8}
 ```
 
 `respuesta` acepta `"si"`, `"probablemente"`, `"no-se"`,
@@ -101,8 +115,14 @@ Racket hace `flush-output` después de cada respuesta para que el
 {"tipo": "pregunta", "caracteristica": "mamifero", "numero_pregunta": 1}
 {"tipo": "prediccion", "entidad": "tigre", "certeza": 0.999, "porcentaje": "100%", "explicacion": ["nocturno", "salvaje", "..."]}
 {"tipo": "sin_preguntas", "mejor_candidato": "tigre", "certeza": 0.4}
+{"tipo": "estadisticas", "partidas": 5, "aciertos": 3, "fallos": 2, "promedio_preguntas": 6.7}
 {"tipo": "error", "mensaje": "..."}
 ```
+
+Las estadísticas se acumulan en Racket (`backend/estadisticas.rkt`) y se
+persisten en `backend/estadisticas.json` (no versionado); tanto
+`"estadisticas"` como `"registrar_resultado"` devuelven el objeto
+`"estadisticas"` completo y ya actualizado.
 
 ## Diseño del motor de Factores de Certeza
 

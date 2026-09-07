@@ -37,13 +37,14 @@ def _fuente_base64(ruta):
 
 
 class AkinatorVista:
-    """Dibuja el estado actual del juego. La partida en curso vive en st.session_state. Las
-    estadísticas acumuladas viven en el controlador/servicio, que a su
-    vez las persiste en datos/estadisticas.json.
+    """Dibuja el estado actual del juego. La partida en curso vive en
+    st.session_state. Las estadísticas acumuladas las calcula y persiste
+    el motor Scheme; esta vista solo las pide/reporta por el protocolo.
     """
 
-    def __init__(self, controlador):
-        self.controlador = controlador
+    def __init__(self, servicio, estadisticas_servicio):
+        self.servicio = servicio
+        self.estadisticas_servicio = estadisticas_servicio
 
     # ------------------------------------------------------------------ 
     # Entrada principal
@@ -58,7 +59,7 @@ class AkinatorVista:
 
     def _inicializar_estado_partida(self):
         if "resultado_actual" not in st.session_state:
-            st.session_state.resultado_actual = self.controlador.iniciar_partida()
+            st.session_state.resultado_actual = self.servicio.iniciar()
         if "historial" not in st.session_state:
             st.session_state.historial = []
 
@@ -68,12 +69,12 @@ class AkinatorVista:
     def _barra_lateral(self):
         with st.sidebar:
             st.markdown("### Estadísticas")
-            stats = self.controlador.obtener_estadisticas()
+            stats = self.estadisticas_servicio.obtener()
             col1, col2 = st.columns(2)
-            col1.metric("Partidas", stats.partidas)
-            col2.metric("Prom. preguntas", stats.promedio_preguntas)
-            col1.metric("Aciertos", stats.aciertos)
-            col2.metric("Fallos", stats.fallos)
+            col1.metric("Partidas", stats["partidas"])
+            col2.metric("Prom. preguntas", stats["promedio_preguntas"])
+            col1.metric("Aciertos", stats["aciertos"])
+            col2.metric("Fallos", stats["fallos"])
 
             st.markdown("---")
             st.markdown("### Historial de esta partida")
@@ -145,7 +146,7 @@ class AkinatorVista:
             with columna:
                 if st.button(etiqueta, key=f"resp_{simbolo}_{numero}", use_container_width=True):
                     st.session_state.historial.append({"pregunta": texto, "respuesta": etiqueta})
-                    st.session_state.resultado_actual = self.controlador.responder(simbolo)
+                    st.session_state.resultado_actual = self.servicio.responder(simbolo)
                     st.rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
@@ -225,13 +226,13 @@ class AkinatorVista:
 
         with col1:
             if st.button("Correcto", key="correcto", use_container_width=True):
-                self.controlador.registrar_acierto(numero_preguntas)
+                self.estadisticas_servicio.registrar_resultado(True, numero_preguntas)
                 st.session_state.mensaje_cierre = "¡Genial! Se registró como acierto."
                 self._reiniciar_partida()
 
         with col2:
             if st.button("Incorrecto", key="incorrecto", use_container_width=True):
-                self.controlador.registrar_fallo(numero_preguntas)
+                self.estadisticas_servicio.registrar_resultado(False, numero_preguntas)
                 st.session_state.mensaje_cierre = "Vaya, fallé esta vez. Se registró el resultado."
                 self._reiniciar_partida()
 
@@ -246,7 +247,7 @@ class AkinatorVista:
             st.success(st.session_state.mensaje_cierre)
 
     def _reiniciar_partida(self):
-        st.session_state.resultado_actual = self.controlador.reiniciar_partida()
+        st.session_state.resultado_actual = self.servicio.reiniciar()
         st.session_state.historial = []
         st.rerun()
 

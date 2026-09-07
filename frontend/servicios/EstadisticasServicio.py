@@ -1,15 +1,17 @@
 class EstadisticasServicio:
-    """Mantiene en memoria las estadísticas de la sesión y las persiste
-    en disco a través del repositorio en cada cambio."""
+    """Traduce las acciones de estadisticas (consultar, registrar resultado)
+    al protocolo JSON con el motor Scheme, que es quien las calcula y
+    persiste; el frontend no guarda ni interpreta ese estado."""
 
-    def __init__(self, repositorio):
-        self.repositorio = repositorio
-        self.estadisticas = self.repositorio.cargar()
+    def __init__(self, cliente):
+        self.cliente = cliente
 
     def obtener(self):
-        return self.estadisticas
+        return self.cliente.enviar({"cmd": "estadisticas"})
 
     def registrar_resultado(self, acierto, numero_preguntas):
-        self.estadisticas.registrar_partida(acierto, numero_preguntas)
-        self.repositorio.guardar(self.estadisticas)
-        return self.estadisticas
+        return self.cliente.enviar({
+            "cmd": "registrar_resultado",
+            "acierto": acierto,
+            "numero_preguntas": numero_preguntas,
+        })
