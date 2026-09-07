@@ -8,7 +8,7 @@ protocolo de comunicación con Python para un futuro frontend.
 
 Documento técnico completo (arquitectura, conocimiento, inferencia,
 heurística, comunicación, pruebas y conclusiones, con diagramas):
-[`docs/documento_tecnico.md`](docs/documento_tecnico.md).
+[`docs/documento_tecnico.docx`](docs/documento_tecnico.docx).
 
 ## Estructura del proyecto
 
