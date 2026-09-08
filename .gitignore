@@ -10,6 +10,7 @@ errortrace-compiled/
 *~
 .vscode/
 .idea/
+.~lock.*#
 
 # Notas de planificacion internas (no forman parte del entregable)
 docs/superpowers/

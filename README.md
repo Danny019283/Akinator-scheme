@@ -19,7 +19,8 @@ backend/            Motor de inferencia en Racket
   respuestas.rkt        Tabla de Factores de Certeza por tipo de respuesta del usuario
   motor.rkt              Motor CF: combinación de MYCIN, selección de preguntas, simulación de partidas
   servidor.rkt           Servidor JSON linea-por-linea para hablar con el cliente Python
-  tests/pruebas.rkt   Suite de pruebas (rackunit)
+  casos_limite.rkt        Demostracion narrada de los 5 casos de prueba obligatorios (sección 18)
+  tests/pruebas.rkt   Suite de unit tests (rackunit)
 
 frontend/            Frontend web en Streamlit (proyecto uv)
   app.py                 Punto de entrada: `streamlit run app.py`
@@ -113,6 +114,25 @@ Sin `uv`, el frontend también puede correrse con `pip`:
 cd backend
 raco test tests/pruebas.rkt
 ```
+
+Esta es la suite de **unit tests** (rackunit): verifica funciones
+individuales del motor (`cf-regla`, `combinar-cf`, `filtrar-candidatos`, etc.)
+de forma aislada.
+
+## Cómo correr los casos de prueba obligatorios (sección 18 del enunciado)
+
+```bash
+cd backend
+racket casos_limite.rkt
+```
+
+Esto **no es la suite de unit tests** — es una demostración ejecutable y
+narrada en consola de los 5 casos de prueba obligatorios del enunciado
+(entidad claramente identificable, entidades muy similares, respuesta
+"No sé", respuestas probabilísticas, entidad ambigua), cada uno armando
+una partida completa con `simular-partida` y explicando por qué el
+resultado es el esperado. Pensado para leerse o mostrarse en la
+sustentación, no para integrarse a CI.
 
 ## Cómo correr las pruebas del frontend
 
